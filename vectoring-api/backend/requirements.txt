@@ -1,0 +1,36 @@
+# Web Framework
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+python-multipart==0.0.6
+
+# Database
+sqlalchemy[asyncio]>=2.0.23
+asyncpg>=0.29.0
+alembic>=1.12.1
+pgvector>=0.2.4
+
+# Validation & Config
+pydantic>=2.10.0
+pydantic-settings>=2.1.0
+
+# ML/AI
+sentence-transformers>=2.2.2
+torch>=2.6.0
+
+# Logging & Monitoring
+structlog==23.2.0
+python-json-logger==2.0.7
+
+# Authentication & Security
+python-jose[cryptography]==3.3.0
+PyJWT>=2.8.0
+passlib[bcrypt]==1.7.4
+pydantic[email]>=2.10.0
+
+# Development
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+httpx==0.25.2
+ruff==0.1.6
+mypy==1.7.1

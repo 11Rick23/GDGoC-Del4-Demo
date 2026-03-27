@@ -1,0 +1,25 @@
+# Del4 - PostgreSQL + pgvector
+# mise run setup で起動される開発用 DB コンテナ
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: del4-postgres
+    ports:
+      - "54322:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - del4-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  del4-postgres-data:
+    driver: local

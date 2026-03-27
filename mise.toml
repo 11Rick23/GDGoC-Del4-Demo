@@ -1,0 +1,126 @@
+[tools]
+bun = "1.3.5"
+node = "25.2.1"
+
+[tasks.setup]
+description = "初回セットアップ: DB起動 / npm install / schema migrate / Python環境構築"
+run = """
+set -e
+
+echo "🛑 既存の dev プロセスを停止..."
+PIDS=$(lsof -ti :8000 2>/dev/null || echo "")
+if [ -n "$PIDS" ]; then
+  kill -9 $PIDS 2>/dev/null || true
+  sleep 1
+fi
+
+echo "🛑 既存 del4 コンテナを停止・削除..."
+docker compose -f docker-compose.db.yml down 2>/dev/null || true
+docker stop del4-vector-api 2>/dev/null || true
+docker rm   del4-vector-api 2>/dev/null || true
+
+echo "🐳 PostgreSQL (pgvector) コンテナを起動..."
+docker compose -f docker-compose.db.yml up -d
+
+echo "⏳ DB が起動するまで待機..."
+until docker exec del4-postgres pg_isready -U postgres >/dev/null 2>&1; do
+  printf '.'
+  sleep 1
+done
+echo " Ready!"
+
+echo "📦 npm パッケージをインストール..."
+npm install
+
+echo "🗄️  データベース・スキーマをセットアップ..."
+npm run db:setup
+npm run db:push
+
+echo "🐍 Python 仮想環境をセットアップ..."
+if [ ! -f .venv/bin/uvicorn ]; then
+  python3 -m venv .venv
+  echo "  📥 [1/2] 軽量パッケージをインストール中..."
+  .venv/bin/pip install --progress-bar on fastapi uvicorn structlog pydantic pydantic-settings asyncpg watchfiles
+  echo "  📥 [2/2] ML パッケージをインストール中（torch等で数分かかります）..."
+  .venv/bin/pip install --progress-bar on -r vectoring-api/requirements.txt
+else
+  echo "  ✅ .venv は既に存在します。スキップします（再インストールするには rm -rf .venv してから再実行）"
+fi
+
+echo "📝 vectoring-api/.env を作成..."
+if [ ! -f vectoring-api/.env ]; then
+  cp vectoring-api/.env.example vectoring-api/.env
+fi
+
+echo ""
+echo "✅ セットアップ完了！  →  mise run dev  で起動"
+"""
+
+[tasks.dev]
+description = "FastAPI ベクトルサーバー起動 (port 8000)"
+run = """
+set -e
+
+# DB コンテナが起動していなければ自動起動
+if ! docker exec del4-postgres pg_isready -U postgres >/dev/null 2>&1; then
+  echo "🐳 PostgreSQL を起動しています..."
+  docker compose -f docker-compose.db.yml up -d
+  until docker exec del4-postgres pg_isready -U postgres >/dev/null 2>&1; do
+    printf '.'
+    sleep 1
+  done
+  echo " Ready!"
+fi
+
+cd vectoring-api
+PYTHONPATH=./backend ../.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+"""
+
+[tasks.seed]
+description = "テストデータ投入 → 全ユーザーを自動ベクトル化"
+run = """
+set -e
+
+echo "🌱 テストデータを投入..."
+npm run db:seed
+
+echo "⏳ FastAPI が起動するまで待機..."
+for i in $(seq 1 30); do
+  if curl -sf http://localhost:8000/api/v1/health > /dev/null 2>&1; then
+    break
+  fi
+  printf '.'
+  sleep 1
+done
+echo " Ready!"
+
+echo "🔢 全ユーザーをベクトル化..."
+USER_IDS=$(docker exec del4-postgres psql -U postgres -d del4db -t -A -c "SELECT id FROM users;")
+for uid in $USER_IDS; do
+  echo "  → vectorize userId=$uid"
+  RESP=$(curl -s -X POST http://localhost:8000/api/v1/vectorize-full \
+    -H "Content-Type: application/json" \
+    -d '{"userId":"'"$uid"'"}')
+  echo "$RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print('     ✅', d.get('message', d))" 2>/dev/null \
+    || echo "     ❌ レスポンス: $RESP"
+done
+
+echo ""
+echo "✅ seed & vectorize 完了！"
+echo ""
+echo "🔍 マッチング結果を確認..."
+FIRST_UID=$(docker exec del4-postgres psql -U postgres -d del4db -t -A -c "SELECT id FROM users LIMIT 1;")
+MATCH_RESP=$(curl -s -X POST http://localhost:8000/api/v1/matching \
+  -H "Content-Type: application/json" \
+  -d '{"userId":"'"$FIRST_UID"'"}')
+echo "$MATCH_RESP" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+if d.get('success'):
+    print('  ✅ マッチング成功！ matchCount=' + str(d['matchCount']))
+    for m in d['matches']:
+        print('  rank=' + str(m['rank']) + ' name=' + m['name'] + ' final=' + str(m['scores']['final']))
+else:
+    print('  ❌', d)
+" 2>/dev/null || echo "  ❌ レスポンス: $MATCH_RESP"
+"""

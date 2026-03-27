@@ -1,0 +1,37 @@
+# Vector Function - Docker Compose
+# E5ベクトル化サービス
+
+services:
+  vector-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: del4-vector-api
+    ports:
+      - "8000:8000"
+    environment:
+      # host.docker.internal でホスト側 PostgreSQL (54322) に接続
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@host.docker.internal:54322/del4db}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:3001}
+      - E5_MODEL_NAME=intfloat/multilingual-e5-large
+      - E5_DEVICE=cpu
+      - E5_BATCH_SIZE=32
+    # Linux で host.docker.internal を解決するために必要
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./backend:/app/backend
+      - ./main.py:/app/main.py
+      - huggingface-cache:/root/.cache/huggingface
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  huggingface-cache:
+    driver: local

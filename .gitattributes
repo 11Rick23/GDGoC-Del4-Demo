@@ -1,0 +1,6 @@
+milfy_speak.glb filter=lfs diff=lfs merge=lfs -text
+milfy_nayamu.glb filter=lfs diff=lfs merge=lfs -text
+milfy_otefuri.glb filter=lfs diff=lfs merge=lfs -text
+milfy_unazuku.glb filter=lfs diff=lfs merge=lfs -text
+milfy_yokoyure.glb filter=lfs diff=lfs merge=lfs -text
+*.glb filter=lfs diff=lfs merge=lfs -text
