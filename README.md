@@ -1,3 +1,12 @@
+# はじめに
+本レポジトリは、私が [GDGoC Japan Hackathon](https://www.craftstadium.com/hackathon/gdgocjphack-2026-tokyo) に Team Del4 の一員として出場した際に作成したプロジェクトのデモコードです。
+
+権利の都合上、一部データをプレイスホルダーに置き換えて公開しているため、そのまま動作させることはできません。
+
+私が担当したのは、 Next.js を使ったプロジェクト全体の開発基盤の整備、データベース部分を含む認証システム、そしてWebhookを含むDM機能部分です。
+
+以下、プロジェクトの元の README となります。
+
 # Team Del4
 
 GDGoC Japan Hackathon における Team Del4 の友達マッチングアプリです。
